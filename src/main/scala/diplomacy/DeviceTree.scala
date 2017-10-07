@@ -124,8 +124,14 @@ object DTB
   def apply(dts: String): DTB = {
     val instream = new ByteArrayInputStream(dts.getBytes("UTF-8"))
     val outstream = new ByteArrayOutputStream
+//    println("In: " + dts.getBytes("UTF-8").toString().length())
+//    for (c <- dts.getBytes("UTF-8")) {
+//      System.out.print(c.asInstanceOf[Char])
+//    }
+//    println("Out: " + outstream.toString())
     val proc = "dtc -O dtb" #< instream #> outstream
     require (proc.! == 0, "Failed to run dtc; is it in your path?")
+//    println("Out: " + outstream.size())
     instream.close
     outstream.close
     DTB(outstream.toByteArray)

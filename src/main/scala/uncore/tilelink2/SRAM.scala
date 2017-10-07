@@ -28,7 +28,7 @@ class TLRAM(address: AddressSet, executable: Boolean = true, beatBytes: Int = 4,
   require ((address.mask & (beatBytes-1)) == beatBytes-1)
 
   lazy val module = new Implementation
-  @chiselName class Implementation extends LazyModuleImp(this) {
+  /*@chiselName*/ class Implementation extends LazyModuleImp(this) {
     val io = new Bundle {
       val in = node.bundleIn
     }
@@ -89,6 +89,17 @@ class TLRAM(address: AddressSet, executable: Boolean = true, beatBytes: Int = 4,
 
 /** Synthesizeable unit testing */
 import unittest._
+import uncore.tilelink2.TLRAMModel
+import diplomacy.AddressSet
+import uncore.tilelink2.TLManagerParameters
+import unittest.UnitTest
+import diplomacy.MemoryDevice
+import unittest.HasUnitTestIO
+import diplomacy.SimpleDevice
+import uncore.tilelink2.TLFuzzer
+import diplomacy.LazyModuleImp
+import uncore.tilelink2.TLManagerNode
+import uncore.tilelink2.TLManagerPortParameters
 
 class TLRAMSimple(ramBeatBytes: Int, txns: Int)(implicit p: Parameters) extends LazyModule {
   val fuzz = LazyModule(new TLFuzzer(txns))

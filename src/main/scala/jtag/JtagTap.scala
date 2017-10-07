@@ -8,7 +8,8 @@ import chisel3.util._
   */
 class JTAGIO(hasTRSTn: Boolean = false) extends Bundle {
   val TRSTn = if (hasTRSTn) Some(Output(Bool())) else None
-  val TCK   = Clock(OUTPUT)
+//  val TCK   = Clock(OUTPUT)
+  val TCK   = Clock()
   val TMS   = Output(Bool())
   val TDI   = Output(Bool())
   val TDO   = Input(new Tristate())
