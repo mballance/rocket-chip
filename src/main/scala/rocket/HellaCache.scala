@@ -1,17 +1,15 @@
 // See LICENSE.SiFive for license details.
 // See LICENSE.Berkeley for license details.
 
-package rocket
+package freechips.rocketchip.rocket
 
 import Chisel._
-import config.{Parameters, Field}
-import coreplex._
-import diplomacy._
-import tile._
-import uncore.constants._
-import uncore.tilelink2._
-import uncore.util.{Code, IdentityCode}
-import util.{ParameterizedBundle, RandomReplacement}
+import freechips.rocketchip.config.{Parameters, Field}
+import freechips.rocketchip.coreplex._
+import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.tile._
+import freechips.rocketchip.tilelink._
+import freechips.rocketchip.util._
 import scala.collection.mutable.ListBuffer
 import scala.math.max
 
@@ -22,11 +20,14 @@ case class DCacheParams(
     nTLBEntries: Int = 32,
     tagECC: Code = new IdentityCode,
     dataECC: Code = new IdentityCode,
+    dataECCBytes: Int = 1,
     nMSHRs: Int = 1,
     nSDQ: Int = 17,
     nRPQ: Int = 16,
     nMMIOs: Int = 1,
     blockBytes: Int = 64,
+    acquireBeforeRelease: Boolean = false,
+    pipelineWayMux: Boolean = false,
     scratch: Option[BigInt] = None) extends L1CacheParams {
 
   def dataScratchpadBytes: Int = scratch.map(_ => nSets*blockBytes).getOrElse(0)
@@ -175,23 +176,25 @@ class HellaCacheBundle(outer: HellaCache)(implicit p: Parameters) extends CoreBu
   val hartid = UInt(INPUT, hartIdLen)
   val cpu = (new HellaCacheIO).flip
   val ptw = new TLBPTWIO()
-  val mem = outer.node.bundleOut
+  val errors = new DCacheErrors
 }
 
 class HellaCacheModule(outer: HellaCache) extends LazyModuleImp(outer)
     with HasL1HellaCacheParameters {
-  implicit val edge = outer.node.edgesOut(0)
-  val io = new HellaCacheBundle(outer)
-  val tl_out = io.mem(0)
+  implicit val edge = outer.node.edges.out(0)
+  val (tl_out, _) = outer.node.out(0)
+  val io = IO(new HellaCacheBundle(outer))
 
-  // IOMSHRs must be FIFO
-  edge.manager.requireFifo()
+  private val fifoManagers = edge.manager.managers.filter(TLFIFOFixer.allUncacheable)
+  fifoManagers.foreach { m =>
+    require (m.fifoId == fifoManagers.head.fifoId,
+      s"IOMSHRs must be FIFO for all regions with effects, but HellaCache sees ${m.nodePath.map(_.name)}")
+  }
 }
 
 object HellaCache {
   def apply(hartid: Int, blocking: Boolean, scratch: () => Option[AddressSet] = () => None)(implicit p: Parameters) = {
-    if (blocking) LazyModule(new DCache(hartid, scratch))
-    else LazyModule(new NonBlockingDCache(hartid))
+    if (blocking) new DCache(hartid, scratch) else new NonBlockingDCache(hartid)
   }
 }
 
@@ -203,7 +206,7 @@ trait HasHellaCache extends HasTileLinkMasterPort with HasTileParameters {
   def findScratchpadFromICache: Option[AddressSet]
   val hartid: Int
   var nDCachePorts = 0
-  val dcache = HellaCache(hartid, tileParams.dcache.get.nMSHRs == 0, findScratchpadFromICache _)
+  val dcache = LazyModule(HellaCache(hartid, tileParams.dcache.get.nMSHRs == 0, findScratchpadFromICache _))
   tileBus.node := dcache.node
 }
 
