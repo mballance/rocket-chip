@@ -81,22 +81,8 @@ class TLRAM(
 }
 
 /** Synthesizeable unit testing */
-<<<<<<< HEAD:src/main/scala/uncore/tilelink2/SRAM.scala
-import unittest._
-import uncore.tilelink2.TLRAMModel
-import diplomacy.AddressSet
-import uncore.tilelink2.TLManagerParameters
-import unittest.UnitTest
-import diplomacy.MemoryDevice
-import unittest.HasUnitTestIO
-import diplomacy.SimpleDevice
-import uncore.tilelink2.TLFuzzer
-import diplomacy.LazyModuleImp
-import uncore.tilelink2.TLManagerNode
-import uncore.tilelink2.TLManagerPortParameters
-=======
+
 import freechips.rocketchip.unittest._
->>>>>>> upstream/master:src/main/scala/tilelink/SRAM.scala
 
 class TLRAMSimple(ramBeatBytes: Int, txns: Int)(implicit p: Parameters) extends LazyModule {
   val fuzz = LazyModule(new TLFuzzer(txns))
