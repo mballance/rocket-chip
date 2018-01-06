@@ -3,7 +3,6 @@
 package freechips.rocketchip.tilelink
 
 import Chisel._
-import chisel3.internal.sourceinfo.SourceInfo
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import scala.math.{min,max}
@@ -98,6 +97,7 @@ class TLCacheCork(unsafe: Boolean = false)(implicit p: Parameters) extends LazyM
       val d_d = Wire(in.d)
       d_d <> out.d
       d_d.bits.source := out.d.bits.source >> 1
+      if (unsafe) { d_d.bits.sink := UInt(0) }
 
       when (out.d.bits.opcode === AccessAckData && out.d.bits.source(0)) {
         d_d.bits.opcode := GrantData
@@ -121,10 +121,9 @@ class TLCacheCork(unsafe: Boolean = false)(implicit p: Parameters) extends LazyM
 
 object TLCacheCork
 {
-  // applied to the TL source node; y.node := TLCacheCork()(x.node)
-  def apply(unsafe: Boolean = false)(x: TLOutwardNode)(implicit p: Parameters, sourceInfo: SourceInfo): TLOutwardNode = {
+  def apply(unsafe: Boolean = false)(implicit p: Parameters): TLNode =
+  {
     val cork = LazyModule(new TLCacheCork(unsafe))
-    cork.node :=? x
     cork.node
   }
 }

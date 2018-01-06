@@ -192,31 +192,23 @@ class HellaCacheModule(outer: HellaCache) extends LazyModuleImp(outer)
   }
 }
 
-object HellaCache {
-  def apply(hartid: Int, blocking: Boolean, scratch: () => Option[AddressSet] = () => None)(implicit p: Parameters) = {
-    if (blocking) new DCache(hartid, scratch) else new NonBlockingDCache(hartid)
-  }
-}
-
 /** Mix-ins for constructing tiles that have a HellaCache */
 
-trait HasHellaCache extends HasTileLinkMasterPort with HasTileParameters {
+trait HasHellaCache { this: BaseTile =>
   val module: HasHellaCacheModule
   implicit val p: Parameters
   def findScratchpadFromICache: Option[AddressSet]
-  val hartid: Int
   var nDCachePorts = 0
-  val dcache = LazyModule(HellaCache(hartid, tileParams.dcache.get.nMSHRs == 0, findScratchpadFromICache _))
-  tileBus.node := dcache.node
+  val dcache: HellaCache = LazyModule(
+    if(tileParams.dcache.get.nMSHRs == 0) {
+      new DCache(hartId, findScratchpadFromICache _, p(RocketCrossingKey).head.knownRatio)
+    } else { new NonBlockingDCache(hartId) })
+
+  tlMasterXbar.node := dcache.node
 }
 
-trait HasHellaCacheBundle extends HasTileLinkMasterPortBundle {
+trait HasHellaCacheModule {
   val outer: HasHellaCache
-}
-
-trait HasHellaCacheModule extends HasTileLinkMasterPortModule {
-  val outer: HasHellaCache
-  //val io: HasHellaCacheBundle
   val dcachePorts = ListBuffer[HellaCacheIO]()
   val dcacheArb = Module(new HellaCacheArbiter(outer.nDCachePorts)(outer.p))
   outer.dcache.module.io.cpu <> dcacheArb.io.mem

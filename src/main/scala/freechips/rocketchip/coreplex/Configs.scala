@@ -24,7 +24,7 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
   case PeripheryBusKey => PeripheryBusParams(beatBytes = site(XLen)/8, blockBytes = site(CacheBlockBytes))
   case MemoryBusKey => MemoryBusParams(beatBytes = site(XLen)/8, blockBytes = site(CacheBlockBytes))
   // Additional device Parameters
-  case ErrorParams => ErrorParams(Seq(AddressSet(0x3000, 0xfff)))
+  case ErrorParams => ErrorParams(Seq(AddressSet(0x3000, 0xfff)), maxAtomic=site(XLen)/8, maxTransfer=4096)
   case BootROMParams => BootROMParams(contentFileName = "./bootrom/bootrom.img")
   case DebugModuleParams => DefaultDebugModuleParams(site(XLen))
 })
@@ -45,7 +45,7 @@ class WithNBigCores(n: Int) extends Config((site, here, up) => {
       icache = Some(ICacheParams(
         rowBits = site(SystemBusKey).beatBits,
         blockBytes = site(CacheBlockBytes))))
-    List.tabulate(n)(i => big.copy(hartid = i))
+    List.tabulate(n)(i => big.copy(hartId = i))
   }
 })
 
@@ -67,35 +67,36 @@ class WithNSmallCores(n: Int) extends Config((site, here, up) => {
         nWays = 1,
         nTLBEntries = 4,
         blockBytes = site(CacheBlockBytes))))
-    List.tabulate(n)(i => small.copy(hartid = i))
+    List.tabulate(n)(i => small.copy(hartId = i))
   }
 })
 
-class WithNTinyCores(n: Int) extends Config((site, here, up) => {
-    case XLen => 32
-    case RocketTilesKey => {
-      val tiny = RocketTileParams(
-        core = RocketCoreParams(
-          useVM = false,
-          fpu = None,
-          mulDiv = Some(MulDivParams(mulUnroll = 8))),
-        btb = None,
-        dcache = Some(DCacheParams(
-          rowBits = site(SystemBusKey).beatBits,
-          nSets = 256, // 16Kb scratchpad
-          nWays = 1,
-          nTLBEntries = 4,
-          nMSHRs = 0,
-          blockBytes = site(CacheBlockBytes),
-          scratch = Some(0x80000000L))),
-        icache = Some(ICacheParams(
-          rowBits = site(SystemBusKey).beatBits,
-          nSets = 64,
-          nWays = 1,
-          nTLBEntries = 4,
-          blockBytes = site(CacheBlockBytes))))
-    List.tabulate(n)(i => tiny.copy(hartid = i))
-  }
+class With1TinyCore extends Config((site, here, up) => {
+  case XLen => 32
+  case RocketTilesKey => List(RocketTileParams(
+      core = RocketCoreParams(
+        useVM = false,
+        fpu = None,
+        mulDiv = Some(MulDivParams(mulUnroll = 8))),
+      btb = None,
+      dcache = Some(DCacheParams(
+        rowBits = site(SystemBusKey).beatBits,
+        nSets = 256, // 16Kb scratchpad
+        nWays = 1,
+        nTLBEntries = 4,
+        nMSHRs = 0,
+        blockBytes = site(CacheBlockBytes),
+        scratch = Some(0x80000000L))),
+      icache = Some(ICacheParams(
+        rowBits = site(SystemBusKey).beatBits,
+        nSets = 64,
+        nWays = 1,
+        nTLBEntries = 4,
+        blockBytes = site(CacheBlockBytes)))))
+  case RocketCrossingKey => List(RocketCrossingParams(
+    crossingType = SynchronousCrossing(),
+    master = TileMasterPortParams(cork = Some(true))
+  ))
 })
 
 class WithNBanksPerMemChannel(n: Int) extends Config((site, here, up) => {
@@ -150,13 +151,13 @@ class WithBufferlessBroadcastHub extends Config((site, here, up) => {
  * system depends on coherence between channels in any way,
  * DO NOT use this configuration.
  */
-class WithStatelessBridge extends Config((site, here, up) => {
+class WithIncoherentTiles extends Config((site, here, up) => {
+  case RocketCrossingKey => up(RocketCrossingKey, site) map { r =>
+    r.copy(master = r.master.copy(cork = Some(true)))
+  }
   case BankedL2Key => up(BankedL2Key, site).copy(coherenceManager = { coreplex =>
-    implicit val p = coreplex.p
-    val cork = LazyModule(new TLCacheCork(unsafe = true))
-    val ww = LazyModule(new TLWidthWidget(coreplex.sbusBeatBytes))
-    ww.node :*= cork.node
-    (cork.node, ww.node, () => None)
+    val ww = LazyModule(new TLWidthWidget(coreplex.sbusBeatBytes)(coreplex.p))
+    (ww.node, ww.node, () => None)
   })
 })
 
@@ -242,15 +243,21 @@ class WithBootROMFile(bootROMFile: String) extends Config((site, here, up) => {
 })
 
 class WithSynchronousRocketTiles extends Config((site, here, up) => {
-  case RocketCrossing => SynchronousCrossing()
+  case RocketCrossingKey => up(RocketCrossingKey, site) map { r =>
+    r.copy(crossingType = SynchronousCrossing())
+  }
 })
 
-class WithAynchronousRocketTiles(depth: Int, sync: Int) extends Config((site, here, up) => {
-  case RocketCrossing => AsynchronousCrossing(depth, sync)
+class WithAsynchronousRocketTiles(depth: Int, sync: Int) extends Config((site, here, up) => {
+  case RocketCrossingKey => up(RocketCrossingKey, site) map { r =>
+    r.copy(crossingType = AsynchronousCrossing(depth, sync))
+  }
 })
 
 class WithRationalRocketTiles extends Config((site, here, up) => {
-  case RocketCrossing => RationalCrossing()
+  case RocketCrossingKey => up(RocketCrossingKey, site) map { r =>
+    r.copy(crossingType = RationalCrossing())
+  }
 })
 
 class WithEdgeDataBits(dataBits: Int) extends Config((site, here, up) => {

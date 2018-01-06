@@ -13,10 +13,12 @@ case object XLen extends Field[Int]
 
 // These parameters can be varied per-core
 trait CoreParams {
+  val bootFreqHz: BigInt
   val useVM: Boolean
   val useUser: Boolean
   val useDebug: Boolean
   val useAtomics: Boolean
+  val useAtomicsOnlyForIO: Boolean
   val useCompressed: Boolean
   val mulDiv: Option[MulDivParams]
   val fpu: Option[FPUParams]
@@ -33,7 +35,6 @@ trait CoreParams {
   val nL2TLBEntries: Int
   val mtvecInit: Option[BigInt]
   val mtvecWritable: Boolean
-  val jumpInFrontend: Boolean
   val tileControlAddr: Option[BigInt]
 
   def instBytes: Int = instBits / 8
@@ -48,6 +49,8 @@ trait HasCoreParameters extends HasTileParameters {
   val usingMulDiv = coreParams.mulDiv.nonEmpty
   val usingFPU = coreParams.fpu.nonEmpty
   val usingAtomics = coreParams.useAtomics
+  val usingAtomicsOnlyForIO = coreParams.useAtomicsOnlyForIO
+  val usingAtomicsInCache = usingAtomics && !usingAtomicsOnlyForIO
   val usingCompressed = coreParams.useCompressed
 
   val retireWidth = coreParams.retireWidth
@@ -81,10 +84,14 @@ abstract class CoreModule(implicit val p: Parameters) extends Module
 abstract class CoreBundle(implicit val p: Parameters) extends ParameterizedBundle()(p)
   with HasCoreParameters
 
+class CoreInterrupts(implicit p: Parameters) extends TileInterrupts()(p) {
+  val buserror = coreParams.tileControlAddr.map(a => Bool())
+}
+
 trait HasCoreIO extends HasTileParameters {
   implicit val p: Parameters
   val io = new CoreBundle()(p) with HasExternallyDrivenTileConstants {
-    val interrupts = new TileInterrupts().asInput
+    val interrupts = new CoreInterrupts().asInput
     val imem  = new FrontendIO
     val dmem = new HellaCacheIO
     val ptw = new DatapathPTWIO().flip
