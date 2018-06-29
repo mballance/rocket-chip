@@ -5,7 +5,7 @@ package freechips.rocketchip.tile
 import Chisel._
 
 import freechips.rocketchip.config._
-import freechips.rocketchip.coreplex._
+import freechips.rocketchip.subsystem._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.interrupts._
 import freechips.rocketchip.rocket._
@@ -17,15 +17,20 @@ case object TileKey extends Field[TileParams]
 case object ResetVectorBits extends Field[Int]
 case object MaxHartIdBits extends Field[Int]
 
+abstract class LookupByHartIdImpl {
+  def apply[T <: Data](f: TileParams => Option[T], hartId: UInt): T
+}
+case object LookupByHartId extends Field[LookupByHartIdImpl]
+
 trait TileParams {
   val core: CoreParams
   val icache: Option[ICacheParams]
   val dcache: Option[DCacheParams]
-  val rocc: Seq[RoCCParams]
   val btb: Option[BTBParams]
   val trace: Boolean
   val hartId: Int
   val blockerCtrlAddr: Option[BigInt]
+  val name: Option[String]
 }
 
 trait HasTileParameters {
@@ -35,7 +40,7 @@ trait HasTileParameters {
   def usingVM: Boolean = tileParams.core.useVM
   def usingUser: Boolean = tileParams.core.useUser || usingVM
   def usingDebug: Boolean = tileParams.core.useDebug
-  def usingRoCC: Boolean = !tileParams.rocc.isEmpty
+  def usingRoCC: Boolean = !p(BuildRoCC).isEmpty
   def usingBTB: Boolean = tileParams.btb.isDefined && tileParams.btb.get.nEntries > 0
   def usingPTW: Boolean = usingVM
   def usingDataScratchpad: Boolean = tileParams.dcache.flatMap(_.scratch).isDefined
@@ -72,7 +77,9 @@ trait HasTileParameters {
   def lgCacheBlockBytes = log2Up(cacheBlockBytes)
   def masterPortBeatBytes = p(SystemBusKey).beatBytes
 
-  def dcacheArbPorts = 1 + usingVM.toInt + usingDataScratchpad.toInt + tileParams.rocc.size
+  // TODO make HellaCacheIO diplomatic and remove this brittle collection of hacks
+  //                  Core   PTW                DTIM                    coprocessors           
+  def dcacheArbPorts = 1 + usingVM.toInt + usingDataScratchpad.toInt + p(BuildRoCC).size
 
   // TODO merge with isaString in CSR.scala
   def isaDTS: String = {
@@ -122,7 +129,7 @@ trait HasTileParameters {
 }
 
 /** Base class for all Tiles that use TileLink */
-abstract class BaseTile(tileParams: TileParams, val crossing: CoreplexClockCrossing)
+abstract class BaseTile(tileParams: TileParams, val crossing: SubsystemClockCrossing)
                        (implicit p: Parameters) extends LazyModule with HasTileParameters with HasCrossing
 {
   def module: BaseTileModuleImp[BaseTile]
@@ -135,7 +142,6 @@ abstract class BaseTile(tileParams: TileParams, val crossing: CoreplexClockCross
   protected val tlMasterXbar = LazyModule(new TLXbar)
   protected val tlSlaveXbar = LazyModule(new TLXbar)
   protected val intXbar = LazyModule(new IntXbar)
-  protected val intSinkNode = IntSinkNode(IntSinkPortSimple())
 
   def connectTLSlave(node: TLNode, bytes: Int) {
     DisableMonitors { implicit p =>
@@ -169,9 +175,14 @@ abstract class BaseTile(tileParams: TileParams, val crossing: CoreplexClockCross
 
     Description(s"cpus/cpu@${hartId}", (cpuProperties ++ nextLevelCacheProperty ++ tileProperties ++ extraProperties).toMap)
   }
+
+  // The boundary buffering needed to cut feed-through paths is
+  // microarchitecture specific, so these may need to be overridden
+  def makeMasterBoundaryBuffers(implicit p: Parameters) = TLBuffer(BufferParams.none)
+  def makeSlaveBoundaryBuffers(implicit p: Parameters) = TLBuffer(BufferParams.none)
 }
 
-class BaseTileModuleImp[+L <: BaseTile](val outer: L) extends LazyModuleImp(outer) with HasTileParameters {
+abstract class BaseTileModuleImp[+L <: BaseTile](val outer: L) extends LazyModuleImp(outer) with HasTileParameters {
 
   require(xLen == 32 || xLen == 64)
   require(paddrBits <= maxPAddrBits)
@@ -182,7 +193,7 @@ class BaseTileModuleImp[+L <: BaseTile](val outer: L) extends LazyModuleImp(oute
   val trace = tileParams.trace.option(IO(Vec(tileParams.core.retireWidth, new TracedInstruction).asOutput))
   val constants = IO(new TileInputConstants)
 
-  val fpuOpt = outer.tileParams.core.fpu.map(params => Module(new FPU(params)(outer.p)))
+  val halt_and_catch_fire: Option[Bool]
 }
 
 /** Some other non-tilelink but still standard inputs */

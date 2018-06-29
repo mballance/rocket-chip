@@ -15,6 +15,7 @@ lazy val commonSettings = Seq(
   traceLevel   := 15,
   scalacOptions ++= Seq("-deprecation","-unchecked"),
   libraryDependencies ++= Seq("org.scala-lang" % "scala-reflect" % scalaVersion.value),
+  libraryDependencies ++= Seq("org.json4s" %% "json4s-jackson" % "3.5.3"),
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 )
 
@@ -24,6 +25,7 @@ lazy val macros = (project in file("macros")).settings(commonSettings)
 lazy val rocketchip = (project in file("."))
   .settings(commonSettings, chipSettings)
   .dependsOn(chisel, hardfloat, macros)
+  .aggregate(chisel, hardfloat, macros) // <-- means the running task on rocketchip is also run by aggregate tasks
 
 lazy val addons = settingKey[Seq[String]]("list of addons used for this build")
 lazy val make = inputKey[Unit]("trigger backend-specific makefile command")
@@ -44,3 +46,4 @@ val chipSettings = Seq(
     s"make -C $makeDir  -j $jobs $target".!
   }
 )
+
