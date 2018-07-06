@@ -1,1 +1,0 @@
-chiselscripts@file:///project/fun/rocket_soc/chiselscripts/build/chiselscripts-0.0.1.tar.gz
