@@ -34,9 +34,16 @@ RULES := 1
 ifeq (true,$(PHASE2))
 # build : $(ROCKET_CHIP_JAR) $(ROCKET_CHIP_MACROS_JAR) $(HARDFLOAT_JAR)
 build : $(HARDFLOAT_JAR) $(ROCKET_CHIP_MACROS_JAR) $(ROCKET_CHIP_JAR)
+
+clean :
+	$(Q)rm -rf $(ROCKET_CHIP_DIR)/build $(ROCKET_CHIP_DIR)/lib
+
 else
 build : $(rocket-chip_deps)
 	$(MAKE) -f $(ROCKET_CHIP_SCRIPTS_DIR)/ivpm.mk PHASE2=true build
+
+clean : $(rocket-chip_clean_deps)
+	$(MAKE) -f $(ROCKET_CHIP_SCRIPTS_DIR)/ivpm.mk PHASE2=true clean
 endif
 
 $(HARDFLOAT_JAR) : $(HARDFLOAT_SRC)
