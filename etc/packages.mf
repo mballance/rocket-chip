@@ -1,7 +1,7 @@
 
 # chiselscripts@https://github.com/mballance/chiselscripts.git
-# chiselscripts@https://github.com/mballance/chiselscripts/releases/download/v0.0.1/chiselscripts-0.0.1.tar.gz
-chiselscripts@file:///project/fun/rocket_soc/chiselscripts/build/chiselscripts-0.0.1.tar.gz
+chiselscripts@https://github.com/mballance/chiselscripts/releases/download/0.0.2/chiselscripts-0.0.2.tar.gz
 ivpm-dtc@https://github.com/mballance/ivpm-dtc.git
+berkeley-hardfloat@https://github.com/mballance/berkeley-hardfloat.git
 
 

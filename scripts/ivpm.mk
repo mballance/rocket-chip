@@ -12,16 +12,8 @@ include $(ROCKET_CHIP_DIR)/etc/ivpm.info
 
 # include $(CHISELLIB_DIR)/src/chisellib.mk
 include $(PACKAGES_DIR)/chiselscripts/mkfiles/chiselscripts.mk
+include $(PACKAGES_DIR)/berkeley-hardfloat/mkfiles/berkeley-hardfloat.mk
 include $(ROCKET_CHIP_DIR)/mkfiles/rocket-chip.mk
-
-SV_BFMS_SRC := \
-  $(wildcard $(SV_BFMS_DIR)/src/sv_bfms/axi4/*.scala) \
-  $(wildcard $(SV_BFMS_DIR)/src/sv_bfms/axi4/qvip/*.scala) \
-  $(wildcard $(SV_BFMS_DIR)/src/sv_bfms/generic_sram_line_en_master/*.scala) \
-  $(wildcard $(SV_BFMS_DIR)/src/sv_bfms/uart/*.scala) 
-
-HARDFLOAT_SRC := \
-  $(wildcard $(ROCKET_CHIP_DIR)/hardfloat/src/main/scala/hardfloat/*.scala)
 
 ROCKET_CHIP_MACROS_SRC := \
   $(wildcard $(ROCKET_CHIP_DIR)/macros/src/main/scala/freechips/rocketchip/*.scala)
@@ -32,8 +24,8 @@ ROCKET_CHIP_SRC = $(shell find $(ROCKET_CHIP_DIR)/src -name '*.scala')
 RULES := 1
 
 ifeq (true,$(PHASE2))
-# build : $(ROCKET_CHIP_JAR) $(ROCKET_CHIP_MACROS_JAR) $(HARDFLOAT_JAR)
-build : $(HARDFLOAT_JAR) $(ROCKET_CHIP_MACROS_JAR) $(ROCKET_CHIP_JAR)
+
+build : $(ROCKET_CHIP_MACROS_JAR) $(ROCKET_CHIP_JAR)
 
 clean :
 	$(Q)rm -rf $(ROCKET_CHIP_DIR)/build $(ROCKET_CHIP_DIR)/lib
@@ -46,16 +38,12 @@ clean : $(rocket-chip_clean_deps)
 	$(MAKE) -f $(ROCKET_CHIP_SCRIPTS_DIR)/ivpm.mk PHASE2=true clean
 endif
 
-$(HARDFLOAT_JAR) : $(HARDFLOAT_SRC)
-	$(Q)if test ! -d `dirname $@`; then mkdir -p `dirname $@`; fi
-	$(Q)$(DO_CHISELC)
-
 $(ROCKET_CHIP_MACROS_JAR) : $(ROCKET_CHIP_MACROS_SRC)
 	$(Q)if test ! -d `dirname $@`; then mkdir -p `dirname $@`; fi
 	$(Q)$(DO_CHISELC)
 
 $(ROCKET_CHIP_JAR) : $(ROCKET_CHIP_SRC) \
-  $(ROCKET_CHIP_MACROS_JAR) $(HARDFLOAT_JAR)
+  $(ROCKET_CHIP_MACROS_JAR) $(BERKELEY_HARDFLOAT_JAR)
 	$(Q)if test ! -d `dirname $@`; then mkdir -p `dirname $@`; fi
 	$(Q)$(DO_CHISELC) 
 	$(Q)touch $@

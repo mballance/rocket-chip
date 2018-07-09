@@ -1,3 +1,0 @@
-[submodule "hardfloat"]
-	path = hardfloat
-	url = https://github.com/mballance/berkeley-hardfloat.git

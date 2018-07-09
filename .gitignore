@@ -5,3 +5,5 @@ project/target
 .addons-dont-touch
 /lib/
 /bin/
+lib/
+packages/
