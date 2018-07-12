@@ -46,7 +46,7 @@ $(ROCKET_CHIP_JAR) : $(ROCKET_CHIP_SRC) \
   $(ROCKET_CHIP_MACROS_JAR) $(BERKELEY_HARDFLOAT_JAR)
 	$(Q)if test ! -d `dirname $@`; then mkdir -p `dirname $@`; fi
 	$(Q)$(DO_CHISELC)
-	$(Q)cd $(ROCKET_CHIP_DIR)/src/resources ; zip -r $@ csrc vsrc
+	$(Q)cd $(ROCKET_CHIP_DIR)/src/main/resources ; zip -r $@ csrc vsrc
 	$(Q)touch $@
 
 release : build
